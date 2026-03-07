@@ -185,8 +185,11 @@ const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(
         try {
           faceResult = models.faceLandmarker.detectForVideo(video, timestamp);
           poseResult = models.poseLandmarker.detectForVideo(video, timestamp);
-        } catch {
-          // Silently skip frames where detection fails
+        } catch (err) {
+          // Skip frames where detection fails (e.g. model still warming up)
+          if (process.env.NODE_ENV === "development") {
+            console.warn("MediaPipe detection frame skipped:", err);
+          }
         }
 
         // Draw overlays on canvas
