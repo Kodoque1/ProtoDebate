@@ -3,10 +3,12 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
+    "dev": "next dev --webpack",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "stt:install": "python3 -m venv local_stt/.venv && . local_stt/.venv/bin/activate && pip install -r local_stt/requirements.txt",
+    "stt:serve": ". local_stt/.venv/bin/activate && python local_stt/server.py"
   },
   "dependencies": {
     "@mediapipe/tasks-vision": "^0.10.32",

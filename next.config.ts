@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   },
 
   // Webpack fallback for non-Turbopack environments (e.g., CI analysis tools)
-  webpack: (config) => {
+  webpack: (config, { isServer }) => {
     config.experiments = {
       ...config.experiments,
       asyncWebAssembly: true,
@@ -19,6 +19,20 @@ const nextConfig: NextConfig = {
       test: /\.wasm$/,
       type: "webassembly/async",
     });
+
+    // Externalize onnxruntime-node on server side
+    if (isServer) {
+      config.externals = [...(config.externals || []), "onnxruntime-node", "sharp"];
+    }
+
+    // Configure for transformers.js (browser-only)
+    if (!isServer) {
+      config.resolve.alias = {
+        ...config.resolve.alias,
+        sharp: false,
+        "onnxruntime-node": false,
+      };
+    }
 
     return config;
   },

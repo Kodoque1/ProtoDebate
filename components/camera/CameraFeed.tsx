@@ -67,6 +67,21 @@ export interface CameraFeedHandle {
 const MEDIAPIPE_CDN =
   "https://cdn.jsdelivr.net/npm/@mediapipe/tasks-vision@0.10.32/wasm";
 
+const MEDIAPIPE_XNNPACK_INFO =
+  "INFO: Created TensorFlow Lite XNNPACK delegate for CPU.";
+
+function isMediapipeXnnpackInfo(args: unknown[]): boolean {
+  return args.some((arg) => {
+    if (typeof arg === "string") {
+      return arg.includes(MEDIAPIPE_XNNPACK_INFO);
+    }
+    if (arg instanceof Error) {
+      return arg.message.includes(MEDIAPIPE_XNNPACK_INFO);
+    }
+    return false;
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Helper to build the MediaPipe models
 // ---------------------------------------------------------------------------
@@ -149,6 +164,26 @@ const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(
       let cancelled = false;
       let animFrameId: number | null = null;
       let lastTimestamp = -1;
+
+      // Install global console filter for MediaPipe XNNPACK noise
+      const originalConsoleError = console.error;
+      const originalConsoleLog = console.log;
+      const originalConsoleInfo = console.info;
+
+      console.error = (...args: unknown[]) => {
+        if (isMediapipeXnnpackInfo(args)) return;
+        originalConsoleError(...args);
+      };
+
+      console.log = (...args: unknown[]) => {
+        if (isMediapipeXnnpackInfo(args)) return;
+        originalConsoleLog(...args);
+      };
+
+      console.info = (...args: unknown[]) => {
+        if (isMediapipeXnnpackInfo(args)) return;
+        originalConsoleInfo(...args);
+      };
 
       function runFrame() {
         const video = videoRef.current;
@@ -289,6 +324,10 @@ const CameraFeed = forwardRef<CameraFeedHandle, CameraFeedProps>(
           modelsRef.current.poseLandmarker.close();
           modelsRef.current = null;
         }
+        // Restore original console functions
+        console.error = originalConsoleError;
+        console.log = originalConsoleLog;
+        console.info = originalConsoleInfo;
       };
     }, []);
 

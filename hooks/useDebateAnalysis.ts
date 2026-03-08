@@ -86,6 +86,7 @@ export function useDebateAnalysis(
   isRunning: boolean;
   start: () => void;
   stop: () => void;
+  reset: () => void;
   updateFaceLandmarks: (landmarks: NormalizedLandmark[]) => void;
   updatePoseLandmarks: (landmarks: NormalizedLandmark[]) => void;
   updateAudioMetrics: (metrics: Partial<AudioMetrics>) => void;
@@ -98,6 +99,13 @@ export function useDebateAnalysis(
   // Internal counters kept in refs to avoid re-renders on every frame
   const frameCount = useRef(0);
   const lookingFrames = useRef(0);
+  const lastGazeRef = useRef<GazeMetrics>({ cameraContactPct: 0, isLooking: false });
+  const lastPostureRef = useRef<PostureMetrics>({
+    armOpenness: null,
+    handsJoined: false,
+    shoulderTilt: null,
+    postureAlert: false,
+  });
   const handsJoinedSince = useRef<number | null>(null);
   const startTime = useRef<number | null>(null);
   const timerRef = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -109,6 +117,13 @@ export function useDebateAnalysis(
   const start = useCallback(() => {
     frameCount.current = 0;
     lookingFrames.current = 0;
+    lastGazeRef.current = { cameraContactPct: 0, isLooking: false };
+    lastPostureRef.current = {
+      armOpenness: null,
+      handsJoined: false,
+      shoulderTilt: null,
+      postureAlert: false,
+    };
     handsJoinedSince.current = null;
     startTime.current = Date.now();
     setAnalysis(DEFAULT_ANALYSIS);
@@ -128,6 +143,26 @@ export function useDebateAnalysis(
       clearInterval(timerRef.current);
       timerRef.current = null;
     }
+  }, []);
+
+  const reset = useCallback(() => {
+    setIsRunning(false);
+    frameCount.current = 0;
+    lookingFrames.current = 0;
+    lastGazeRef.current = { cameraContactPct: 0, isLooking: false };
+    lastPostureRef.current = {
+      armOpenness: null,
+      handsJoined: false,
+      shoulderTilt: null,
+      postureAlert: false,
+    };
+    handsJoinedSince.current = null;
+    startTime.current = null;
+    if (timerRef.current) {
+      clearInterval(timerRef.current);
+      timerRef.current = null;
+    }
+    setAnalysis(DEFAULT_ANALYSIS);
   }, []);
 
   // Clean up on unmount
@@ -153,6 +188,17 @@ export function useDebateAnalysis(
         frameCount.current > 0
           ? Math.round((lookingFrames.current / frameCount.current) * 100)
           : 0;
+
+      // Throttle React updates and skip unchanged gaze state
+      if (frameCount.current % 3 !== 0) return;
+      const prevGaze = lastGazeRef.current;
+      if (
+        prevGaze.isLooking === looking &&
+        prevGaze.cameraContactPct === cameraContactPct
+      ) {
+        return;
+      }
+      lastGazeRef.current = { isLooking: looking, cameraContactPct };
 
       setAnalysis((prev) => ({
         ...prev,
@@ -188,6 +234,17 @@ export function useDebateAnalysis(
         handsJoinedSince.current !== null &&
         Date.now() - handsJoinedSince.current > handsJoinedAlertMs;
 
+      const prevPosture = lastPostureRef.current;
+      if (
+        prevPosture.armOpenness === armOpenness &&
+        prevPosture.handsJoined === handsJoined &&
+        prevPosture.shoulderTilt === shoulderTilt &&
+        prevPosture.postureAlert === postureAlert
+      ) {
+        return;
+      }
+      lastPostureRef.current = { armOpenness, handsJoined, shoulderTilt, postureAlert };
+
       setAnalysis((prev) => ({
         ...prev,
         posture: { armOpenness, handsJoined, shoulderTilt, postureAlert },
@@ -216,6 +273,7 @@ export function useDebateAnalysis(
     isRunning,
     start,
     stop,
+    reset,
     updateFaceLandmarks,
     updatePoseLandmarks,
     updateAudioMetrics,
